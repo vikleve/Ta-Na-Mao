@@ -1,20 +1,33 @@
 /**
- * ChamaPro - Authentication & Backend User Service
- * Gerenciamento de Sessão (Cliente vs Profissional) & Cadastro Real em DB/LocalStorage
+ * Tá na Mão - Authentication & User Session Service (RF03 & RF05)
+ * Gerenciamento seguro de sessão sem contas fictícias nem dados inventados.
  */
 
 const ChamaProAuth = {
-  // Estado do Usuário Ativo
-  currentUser: JSON.parse(localStorage.getItem('chamapro_user')) || {
-    id: 'usr-client-demo',
-    name: 'Victor (Cliente)',
-    email: 'victor@email.com',
-    role: 'client', // 'client' ou 'pro'
-    avatar: 'https://i.pravatar.cc/100?img=33'
-  },
+  // Usuário ativo (inicia nulo caso não haja sessão legítima salva)
+  currentUser: null,
 
   // Listeners de mudança de autenticação
   listeners: [],
+
+  init() {
+    try {
+      const saved = localStorage.getItem('chamapro_user') || localStorage.getItem('tanamao_user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Só aceita usuário se for uma conta legítima não demo
+        if (parsed && parsed.email && !parsed.email.includes('demo') && !String(parsed.id).includes('demo')) {
+          this.currentUser = parsed;
+        } else {
+          localStorage.removeItem('chamapro_user');
+          localStorage.removeItem('tanamao_user');
+          this.currentUser = null;
+        }
+      }
+    } catch (e) {
+      this.currentUser = null;
+    }
+  },
 
   onAuthChange(callback) {
     this.listeners.push(callback);
@@ -24,19 +37,36 @@ const ChamaProAuth = {
     this.listeners.forEach(cb => cb(this.currentUser));
   },
 
-  // Retorna usuário logado
   getUser() {
     return this.currentUser;
   },
 
-  // Login
-  login(email, password, role = 'client') {
+  // Login de Usuário (Cliente ou Profissional)
+  async login(email, password, role = 'client') {
+    if (!email || !password) {
+      throw new Error('Por favor, informe e-mail e senha.');
+    }
+
+    if (window.TaNaMaoDB) {
+      try {
+        const user = await window.TaNaMaoDB.login(email, password);
+        this.currentUser = user;
+        localStorage.setItem('chamapro_user', JSON.stringify(user));
+        this.notifyListeners();
+        return user;
+      } catch (err) {
+        // Se houver erro de autenticação remota, propaga a mensagem correta
+        console.warn('[Tá na Mão - Auth]', err.message);
+        throw err;
+      }
+    }
+
     const user = {
       id: `usr-${Date.now()}`,
       name: email.split('@')[0],
       email: email,
       role: role,
-      avatar: role === 'pro' ? 'https://i.pravatar.cc/100?img=12' : 'https://i.pravatar.cc/100?img=33'
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80'
     };
     this.currentUser = user;
     localStorage.setItem('chamapro_user', JSON.stringify(user));
@@ -44,48 +74,64 @@ const ChamaProAuth = {
     return user;
   },
 
-  // Registro de Novo Profissional no Banco de Dados da Plataforma
-  registerProfessional(proData) {
+  // Registro de Profissional (sem reviews falsas)
+  async registerProfessional(proData) {
+    if (!proData.name || !proData.title) {
+      throw new Error('Nome e profissão são obrigatórios.');
+    }
+
+    if (window.TaNaMaoDB) {
+      const newPro = await window.TaNaMaoDB.registerProfessional(proData);
+      
+      // Adiciona na memória local do app
+      if (window.ChamaProData && Array.isArray(window.ChamaProData.professionals)) {
+        window.ChamaProData.professionals.unshift(newPro);
+      }
+
+      this.currentUser = {
+        id: newPro.userId,
+        name: newPro.name,
+        email: proData.email || `${newPro.name.toLowerCase().replace(/\s+/g, '')}@tanamao.com`,
+        role: 'pro',
+        proDetails: newPro
+      };
+
+      localStorage.setItem('chamapro_user', JSON.stringify(this.currentUser));
+      this.notifyListeners();
+      return newPro;
+    }
+
     const newPro = {
       id: `pro-${Date.now()}`,
-      name: proData.name,
-      title: proData.title,
+      userId: `usr-${Date.now()}`,
+      name: proData.name.trim(),
+      title: proData.title.trim(),
       category: proData.category,
       rating: 5.0,
-      reviewsCount: 1,
+      reviewsCount: 0,
       distance: 0.5,
-      lat: window.ChamaProData.userLocation.lat + (Math.random() - 0.5) * 0.04,
-      lng: window.ChamaProData.userLocation.lng + (Math.random() - 0.5) * 0.04,
-      startingPrice: parseFloat(proData.startingPrice) || 100,
+      lat: window.ChamaProData.userLocation.lat,
+      lng: window.ChamaProData.userLocation.lng,
+      startingPrice: parseFloat(proData.startingPrice) || 0,
       avatar: proData.avatar || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=300&q=80',
       verified: true,
-      superPro: true,
+      superPro: false,
       availableToday: true,
-      bio: proData.bio,
-      experienceYears: parseInt(proData.experienceYears) || 3,
-      completedJobs: 1,
+      bio: proData.bio || '',
+      experienceYears: parseInt(proData.experienceYears) || 1,
+      completedJobs: 0,
       address: proData.address || 'Sua Região',
-      specialties: proData.specialties ? proData.specialties.split(',').map(s => s.trim()) : ['Atendimento Rápido'],
+      specialties: proData.specialties ? proData.specialties.split(',').map(s => s.trim()) : [],
       portfolio: [],
-      reviews: [
-        {
-          id: `rev-${Date.now()}`,
-          author: 'ChamaPro Boas-Vindas',
-          avatar: 'https://i.pravatar.cc/100?img=60',
-          rating: 5,
-          date: 'Hoje',
-          comment: 'Novo profissional verificado cadastrado na plataforma!',
-          tags: ['Perfil Verificado', 'Novo Pro']
-        }
-      ]
+      reviews: [] // Sem reviews falsas (RF03)
     };
 
-    // Salva na lista global da aplicação
-    window.ChamaProData.professionals.unshift(newPro);
-    
-    // Login automático como profissional
+    if (window.ChamaProData && Array.isArray(window.ChamaProData.professionals)) {
+      window.ChamaProData.professionals.unshift(newPro);
+    }
+
     this.currentUser = {
-      id: newPro.id,
+      id: newPro.userId,
       name: newPro.name,
       email: proData.email,
       role: 'pro',
@@ -99,10 +145,15 @@ const ChamaProAuth = {
 
   // Logout
   logout() {
+    if (window.TaNaMaoDB) {
+      window.TaNaMaoDB.logout();
+    }
     this.currentUser = null;
     localStorage.removeItem('chamapro_user');
+    localStorage.removeItem('tanamao_user');
     this.notifyListeners();
   }
 };
 
+ChamaProAuth.init();
 window.ChamaProAuth = ChamaProAuth;

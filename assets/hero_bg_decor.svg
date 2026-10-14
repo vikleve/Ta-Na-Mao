@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 480" preserveAspectRatio="none" fill="none">
   <!-- Deep Navy Base is handled in CSS: #081730 -->
   
-  <!-- Big Yellow Wedge in Top-Left -->
-  <polygon points="0,0 340,0 0,460" fill="#fec20c" />
+  <!-- Big Orange Wedge in Top-Left -->
+  <polygon points="0,0 340,0 0,460" fill="#FF7900" />
 
   <!-- Action / Comic Lines emanating from Top-Left -->
   <g stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.95">
@@ -12,13 +12,13 @@
     <line x1="40" y1="300" x2="130" y2="380" stroke-width="5" />
   </g>
 
-  <!-- Yellow & White Action Shards (Left side) -->
+  <!-- Orange & White Action Shards (Left side) -->
   <polygon points="260,140 330,165 250,160" fill="#ffffff" />
-  <polygon points="210,230 290,265 200,255" fill="#fec20c" />
+  <polygon points="210,230 290,265 200,255" fill="#FF7900" />
   <polygon points="150,330 220,375 140,360" fill="#ffffff" />
 
   <!-- Comic Burst Action on the Right side -->
-  <g fill="#fec20c" opacity="0.95">
+  <g fill="#FF7900" opacity="0.95">
     <polygon points="1600,120 1480,180 1560,210" />
     <polygon points="1600,240 1520,270 1580,300" />
   </g>
@@ -27,8 +27,8 @@
     <polygon points="1600,280 1550,300 1590,320" />
   </g>
 
-  <!-- Yellow Dynamic Speed Rays on Right Edge -->
-  <line x1="1560" y1="150" x2="1420" y2="210" stroke="#fec20c" stroke-width="5" stroke-linecap="round" />
+  <!-- Orange Dynamic Speed Rays on Right Edge -->
+  <line x1="1560" y1="150" x2="1420" y2="210" stroke="#FF7900" stroke-width="5" stroke-linecap="round" />
   <line x1="1580" y1="230" x2="1460" y2="280" stroke="#ffffff" stroke-width="4" stroke-linecap="round" />
-  <line x1="1550" y1="310" x2="1470" y2="340" stroke="#fec20c" stroke-width="5" stroke-linecap="round" />
+  <line x1="1550" y1="310" x2="1470" y2="340" stroke="#FF7900" stroke-width="5" stroke-linecap="round" />
 </svg>

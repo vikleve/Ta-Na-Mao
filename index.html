@@ -57,7 +57,7 @@
           <h1 class="hero-headline">
             O que você precisa <span class="highlight-resolver">resolver?
               <svg class="curve-underline-svg" viewBox="0 0 160 20" fill="none">
-                <path d="M 4 8 C 45 18, 115 18, 156 6 C 120 15, 40 14, 4 8 Z" fill="#fec20c" />
+                <path d="M 4 8 C 45 18, 115 18, 156 6 C 120 15, 40 14, 4 8 Z" fill="#FF7900" />
               </svg>
             </span>
           </h1>
@@ -140,7 +140,7 @@
             <div class="results-header">
               <div>
                 <h2 class="results-title">Resultados da busca</h2>
-                <p class="results-subtitle" id="resultsSubtitle">Encontramos 12 serviços para "mecânico"</p>
+                <p class="results-subtitle" id="resultsSubtitle">Encontre profissionais qualificados perto de você</p>
               </div>
               <div class="sort-select-wrapper">
                 <select id="sortSelect" class="sort-select">
@@ -313,11 +313,11 @@
         <form id="formLoginClient">
           <div class="form-group">
             <label class="form-label">E-mail</label>
-            <input type="email" id="loginEmail" class="form-control" placeholder="seu@email.com" value="cliente.demo@tanamao.com" required>
+            <input type="email" id="loginEmail" class="form-control" placeholder="seu@email.com" required>
           </div>
           <div class="form-group">
             <label class="form-label">Senha</label>
-            <input type="password" id="loginPass" class="form-control" value="123456" required>
+            <input type="password" id="loginPass" class="form-control" placeholder="Sua senha secreta" required>
           </div>
           <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.9rem;">
             Entrar no Tá na Mão
@@ -334,7 +334,7 @@
             <input type="text" id="regProTitle" class="form-control" placeholder="Ex: Eletricista Especialista Residencial" required>
           </div>
           <div class="form-group">
-            <label class="form-label">Categoria Principal</label>
+            <label class="form-label">Profissão / Categoria Principal</label>
             <select id="regProCategory" class="form-control">
               <option value="eletricista">Eletricista</option>
               <option value="encanador">Encanador</option>
@@ -344,15 +344,37 @@
               <option value="pintor">Pintor</option>
               <option value="pedreiro">Pedreiro</option>
               <option value="celular">Técnico de Celular</option>
+              <option value="__custom__">➕ Outra profissão...</option>
             </select>
           </div>
+
+          <!-- Campo dinâmico para Outra Profissão (RF04) -->
+          <div class="form-group" id="groupCustomCategory" style="display: none; background: rgba(255,121,0,0.06); padding: 0.85rem; border-radius: var(--radius-md); border: 1px dashed var(--brand-primary);">
+            <label class="form-label" style="color: var(--brand-primary);"><i class="fa-solid fa-pen-nib"></i> Digite a sua profissão</label>
+            <input type="text" id="regProCustomName" class="form-control" placeholder="Ex: Chaveiro, Marceneiro, Jardineiro, Babá...">
+            <small style="color: var(--text-muted); font-size: 0.78rem; display: block; margin-top: 0.35rem;">
+              Sua profissão será cadastrada e estará imediatamente disponível para buscas e filtros de clientes.
+            </small>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Especialidades & Serviços Oferecidos</label>
+            <input type="text" id="regProSpecialties" class="form-control" placeholder="Ex: Instalação de ar, Troca de tomadas, Quadros elétricos (separados por vírgula)">
+          </div>
+
           <div class="form-group">
             <label class="form-label">Preço Inicial Estimado (R$)</label>
             <input type="number" id="regProPrice" class="form-control" placeholder="80" required>
           </div>
+
+          <div class="form-group">
+            <label class="form-label">WhatsApp / Telefone para Contato</label>
+            <input type="tel" id="regProPhone" class="form-control" placeholder="(81) 98888-7777">
+          </div>
+
           <div class="form-group">
             <label class="form-label">Sua Bio & Experiência</label>
-            <textarea id="regProBio" class="form-control" placeholder="Descreva sua experiência, cursos e garantia..." required></textarea>
+            <textarea id="regProBio" class="form-control" placeholder="Descreva sua experiência, cursos, garantia e diferenciais..." required></textarea>
           </div>
           <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.9rem;">
             <i class="fa-solid fa-user-plus"></i> Finalizar Cadastro Profissional
@@ -487,6 +509,8 @@
 
   <!-- Scripts -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/db.js"></script>
   <script src="js/data.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/geo.js"></script>
