@@ -425,14 +425,52 @@
               .eq('id', data.user.id)
               .single();
 
-            const userObj = profile || {
+            let userObj = profile ? {
+              id: profile.id,
+              email: profile.email || data.user.email,
+              name: profile.name,
+              role: profile.role || 'client',
+              phone: profile.phone || '',
+              avatar: profile.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80'
+            } : {
               id: data.user.id,
               email: data.user.email,
               name: email.split('@')[0],
-              role: 'client'
+              role: 'client',
+              avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80'
             };
+
+            // Verificar se o usuário possui registro como profissional
+            const { data: proRecord } = await this.supabase
+              .from('professionals')
+              .select('*')
+              .eq('user_id', data.user.id)
+              .single();
+
+            if (proRecord) {
+              userObj.role = 'pro';
+              userObj.proDetails = {
+                id: proRecord.id,
+                userId: proRecord.user_id,
+                name: proRecord.name,
+                title: proRecord.title,
+                category: proRecord.category_slug,
+                professionName: proRecord.profession_name,
+                startingPrice: parseFloat(proRecord.starting_price) || 0,
+                bio: proRecord.bio || '',
+                phone: proRecord.phone || '',
+                address: proRecord.address || 'Sua Região',
+                avatar: proRecord.avatar_url || userObj.avatar,
+                rating: parseFloat(proRecord.rating) || 5.0,
+                reviewsCount: parseInt(proRecord.reviews_count) || 0,
+                specialties: proRecord.specialties || []
+              };
+              userObj.avatar = proRecord.avatar_url || userObj.avatar;
+            }
+
             this.currentUser = userObj;
             localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userObj));
+            localStorage.setItem('chamapro_user', JSON.stringify(userObj));
             this.notifyListeners();
             return userObj;
           }
@@ -441,7 +479,63 @@
         }
       }
 
-      // Sessão de desenvolvimento caso Supabase não esteja conectado
+      // Sessão local: verificar se existe conta de profissional ou cliente registrada
+      const normEmail = email.trim().toLowerCase();
+      
+      // 1. Verificar em profissionais salvos localmente
+      try {
+        const storedPros = localStorage.getItem(STORAGE_KEYS.PROFESSIONALS);
+        if (storedPros) {
+          const pros = JSON.parse(storedPros);
+          const foundPro = pros.find(p => p.email && p.email.toLowerCase() === normEmail);
+          if (foundPro) {
+            const user = {
+              id: foundPro.userId || foundPro.id,
+              name: foundPro.name,
+              email: foundPro.email,
+              role: 'pro',
+              avatar: foundPro.avatar || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=300&q=80',
+              phone: foundPro.phone || '',
+              proDetails: foundPro
+            };
+            this.currentUser = user;
+            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+            localStorage.setItem('chamapro_user', JSON.stringify(user));
+            this.notifyListeners();
+            return user;
+          }
+        }
+      } catch (e) {
+        console.warn(e);
+      }
+
+      // 2. Verificar em contas de clientes registradas localmente
+      try {
+        const storedAccounts = localStorage.getItem('tanamao_registered_accounts');
+        if (storedAccounts) {
+          const accounts = JSON.parse(storedAccounts);
+          const foundAcc = accounts.find(a => a.email && a.email.toLowerCase() === normEmail);
+          if (foundAcc) {
+            const user = {
+              id: foundAcc.id,
+              name: foundAcc.name,
+              email: foundAcc.email,
+              role: foundAcc.role || 'client',
+              avatar: foundAcc.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80',
+              phone: foundAcc.phone || ''
+            };
+            this.currentUser = user;
+            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+            localStorage.setItem('chamapro_user', JSON.stringify(user));
+            this.notifyListeners();
+            return user;
+          }
+        }
+      } catch (e) {
+        console.warn(e);
+      }
+
+      // 3. Caso não encontrada anteriormente, criar e registrar sessão
       const user = {
         id: `usr-${Date.now()}`,
         name: email.split('@')[0],
@@ -449,24 +543,35 @@
         role: 'client',
         avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80'
       };
+
+      try {
+        const storedAccounts = localStorage.getItem('tanamao_registered_accounts');
+        const accounts = storedAccounts ? JSON.parse(storedAccounts) : [];
+        accounts.push({ ...user, password });
+        localStorage.setItem('tanamao_registered_accounts', JSON.stringify(accounts));
+      } catch (e) {}
+
       this.currentUser = user;
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+      localStorage.setItem('chamapro_user', JSON.stringify(user));
       this.notifyListeners();
       return user;
     }
 
-    // Cadastro de Novo Usuário com Supabase Auth
-    async registerUser(email, password, name, role = 'client') {
+    // Cadastro de Novo Usuário (Cliente ou Profissional) com suporte a foto personalizada
+    async registerUser(email, password, name, role = 'client', avatar = null) {
       if (!email || !password || !name) {
         throw new Error('Preencha todos os campos obrigatórios.');
       }
+
+      const userAvatar = avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80';
 
       if (this.isOnline && this.supabase) {
         try {
           const { data, error } = await this.supabase.auth.signUp({
             email,
             password,
-            options: { data: { name, role } }
+            options: { data: { name, role, avatar_url: userAvatar } }
           });
           if (error) throw new Error(error.message);
 
@@ -475,12 +580,14 @@
               id: data.user.id,
               email: email,
               name: name,
-              role: role
+              role: role,
+              avatar_url: userAvatar
             }]);
 
-            const user = { id: data.user.id, email, name, role };
+            const user = { id: data.user.id, email, name, role, avatar: userAvatar };
             this.currentUser = user;
             localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+            localStorage.setItem('chamapro_user', JSON.stringify(user));
             this.notifyListeners();
             return user;
           }
@@ -491,15 +598,167 @@
 
       const user = {
         id: `usr-${Date.now()}`,
-        name: name,
-        email: email,
+        name: name.trim(),
+        email: email.trim(),
         role: role,
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80'
+        avatar: userAvatar
       };
+
+      try {
+        const storedAccounts = localStorage.getItem('tanamao_registered_accounts');
+        const accounts = storedAccounts ? JSON.parse(storedAccounts) : [];
+        // Evita duplicatas com mesmo e-mail
+        const filtered = accounts.filter(a => a.email.toLowerCase() !== email.trim().toLowerCase());
+        filtered.push({ ...user, password });
+        localStorage.setItem('tanamao_registered_accounts', JSON.stringify(filtered));
+      } catch (e) {
+        console.warn(e);
+      }
+
       this.currentUser = user;
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+      localStorage.setItem('chamapro_user', JSON.stringify(user));
       this.notifyListeners();
       return user;
+    }
+
+    // Atualização de Perfil (foto do dispositivo, nome, bio, etc.)
+    async updateProfile(userId, updates = {}) {
+      if (!userId) return null;
+
+      if (this.currentUser && (this.currentUser.id === userId || this.currentUser.userId === userId)) {
+        this.currentUser = { ...this.currentUser, ...updates };
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(this.currentUser));
+        localStorage.setItem('chamapro_user', JSON.stringify(this.currentUser));
+      }
+
+      // Se for profissional, atualiza na lista de profissionais
+      try {
+        const storedPros = localStorage.getItem(STORAGE_KEYS.PROFESSIONALS);
+        if (storedPros) {
+          const pros = JSON.parse(storedPros);
+          let updated = false;
+          const newPros = pros.map(p => {
+            if (p.userId === userId || p.id === userId) {
+              updated = true;
+              return { ...p, ...updates };
+            }
+            return p;
+          });
+          if (updated) {
+            localStorage.setItem(STORAGE_KEYS.PROFESSIONALS, JSON.stringify(newPros));
+            if (window.ChamaProData && Array.isArray(window.ChamaProData.professionals)) {
+              window.ChamaProData.professionals = newPros;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn(e);
+      }
+
+      // Atualiza também nas contas registradas
+      try {
+        const storedAccounts = localStorage.getItem('tanamao_registered_accounts');
+        if (storedAccounts) {
+          const accounts = JSON.parse(storedAccounts);
+          const newAccounts = accounts.map(a => a.id === userId ? { ...a, ...updates } : a);
+          localStorage.setItem('tanamao_registered_accounts', JSON.stringify(newAccounts));
+        }
+      } catch (e) {}
+
+      // Supabase
+      if (this.isOnline && this.supabase) {
+        try {
+          const profileData = {};
+          if (updates.name) profileData.name = updates.name;
+          if (updates.avatar) profileData.avatar_url = updates.avatar;
+          if (updates.phone) profileData.phone = updates.phone;
+          if (Object.keys(profileData).length > 0) {
+            await this.supabase.from('profiles').update(profileData).eq('id', userId);
+          }
+
+          if (this.currentUser && this.currentUser.role === 'pro') {
+            const proData = {};
+            if (updates.name) proData.name = updates.name;
+            if (updates.title) proData.title = updates.title;
+            if (updates.avatar) proData.avatar_url = updates.avatar;
+            if (updates.phone) proData.phone = updates.phone;
+            if (updates.bio) proData.bio = updates.bio;
+            if (updates.startingPrice) proData.starting_price = parseFloat(updates.startingPrice) || 0;
+            if (Object.keys(proData).length > 0) {
+              await this.supabase.from('professionals').update(proData).eq('user_id', userId);
+            }
+          }
+        } catch (e) {
+          console.warn('[Tá na Mão - DB] Erro ao sincronizar atualização de perfil no Supabase:', e);
+        }
+      }
+
+      this.notifyListeners();
+      return this.currentUser;
+    }
+
+    // Exclusão Definitiva de Perfil do Usuário / Profissional
+    async deleteProfile(userId) {
+      if (!userId) return false;
+
+      // 1. Remover do Supabase caso conectado
+      if (this.isOnline && this.supabase) {
+        try {
+          await this.supabase.from('professionals').delete().eq('user_id', userId);
+          await this.supabase.from('quotes').delete().eq('client_id', userId);
+          await this.supabase.from('profiles').delete().eq('id', userId);
+          await this.supabase.auth.signOut();
+        } catch (e) {
+          console.warn('[Tá na Mão - DB] Erro ao excluir dados no Supabase:', e);
+        }
+      }
+
+      // 2. Remover da lista de profissionais local
+      try {
+        const storedPros = localStorage.getItem(STORAGE_KEYS.PROFESSIONALS);
+        if (storedPros) {
+          const pros = JSON.parse(storedPros);
+          const filtered = pros.filter(p => p.userId !== userId && p.id !== userId);
+          localStorage.setItem(STORAGE_KEYS.PROFESSIONALS, JSON.stringify(filtered));
+          if (window.ChamaProData && Array.isArray(window.ChamaProData.professionals)) {
+            window.ChamaProData.professionals = filtered;
+          }
+        }
+      } catch (e) {
+        console.warn(e);
+      }
+
+      // 3. Remover de contas locais
+      try {
+        const storedAccounts = localStorage.getItem('tanamao_registered_accounts');
+        if (storedAccounts) {
+          const accounts = JSON.parse(storedAccounts);
+          const filtered = accounts.filter(a => a.id !== userId);
+          localStorage.setItem('tanamao_registered_accounts', JSON.stringify(filtered));
+        }
+      } catch (e) {}
+
+      // 4. Remover orçamentos locais vinculados
+      try {
+        const storedQuotes = localStorage.getItem(STORAGE_KEYS.QUOTES);
+        if (storedQuotes) {
+          const quotes = JSON.parse(storedQuotes);
+          const filtered = quotes.filter(q => q.clientId !== userId);
+          localStorage.setItem(STORAGE_KEYS.QUOTES, JSON.stringify(filtered));
+          if (window.ChamaProData && Array.isArray(window.ChamaProData.myRequests)) {
+            window.ChamaProData.myRequests = filtered;
+          }
+        }
+      } catch (e) {}
+
+      // 5. Limpar sessão
+      this.currentUser = null;
+      localStorage.removeItem(STORAGE_KEYS.USER);
+      localStorage.removeItem('chamapro_user');
+      localStorage.removeItem('tanamao_user');
+      this.notifyListeners();
+      return true;
     }
 
     logout() {
@@ -508,6 +767,8 @@
       }
       this.currentUser = null;
       localStorage.removeItem(STORAGE_KEYS.USER);
+      localStorage.removeItem('chamapro_user');
+      localStorage.removeItem('tanamao_user');
       this.notifyListeners();
     }
 

@@ -14,8 +14,51 @@ document.addEventListener('DOMContentLoaded', async () => {
     activeUrgency: 'Hoje',
     ratingStars: 5,
     activeChatProId: null,
-    theme: localStorage.getItem('chamapro_theme') || 'light'
+    theme: localStorage.getItem('chamapro_theme') || 'light',
+    regClientAvatar: null,
+    regProAvatar: null,
+    currentProfileAvatar: null
   };
+
+  // Processador e compressor de fotos do dispositivo (Canvas)
+  function processImageFile(file, maxWidth = 320, maxHeight = 320, quality = 0.85) {
+    return new Promise((resolve, reject) => {
+      if (!file) return resolve(null);
+      if (!file.type || !file.type.startsWith('image/')) {
+        return reject(new Error('Por favor, selecione um arquivo de imagem válido (PNG, JPG, WEBP).'));
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl);
+        };
+        img.onerror = () => reject(new Error('Erro ao processar imagem.'));
+        img.src = e.target.result;
+      };
+      reader.onerror = () => reject(new Error('Erro ao ler arquivo do dispositivo.'));
+      reader.readAsDataURL(file);
+    });
+  }
 
   // Elementos do DOM
   const el = {
@@ -47,13 +90,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     dropzone: document.getElementById('photoDropzone'),
     photoPreview: document.getElementById('photoPreview'),
     tabAuthLogin: document.getElementById('tabAuthLogin'),
+    tabAuthRegisterClient: document.getElementById('tabAuthRegisterClient'),
     tabAuthRegisterPro: document.getElementById('tabAuthRegisterPro'),
     formLoginClient: document.getElementById('formLoginClient'),
+    formRegisterClient: document.getElementById('formRegisterClient'),
     formRegisterPro: document.getElementById('formRegisterPro'),
+    regClientAvatarFile: document.getElementById('regClientAvatarFile'),
+    regClientAvatarPreview: document.getElementById('regClientAvatarPreview'),
+    regProAvatarFile: document.getElementById('regProAvatarFile'),
+    regProAvatarPreview: document.getElementById('regProAvatarPreview'),
     regProCategory: document.getElementById('regProCategory'),
     groupCustomCategory: document.getElementById('groupCustomCategory'),
     regProCustomName: document.getElementById('regProCustomName'),
-    sidebarCategory: document.getElementById('sidebarCategory')
+    sidebarCategory: document.getElementById('sidebarCategory'),
+    // Modal Meu Perfil & Exclusão
+    myProfileModal: document.getElementById('myProfileModal'),
+    formEditProfile: document.getElementById('formEditProfile'),
+    myProfileAvatarFile: document.getElementById('myProfileAvatarFile'),
+    myProfileAvatarPreview: document.getElementById('myProfileAvatarPreview'),
+    myProfileBadgeRole: document.getElementById('myProfileBadgeRole'),
+    editProfileName: document.getElementById('editProfileName'),
+    editProfileEmail: document.getElementById('editProfileEmail'),
+    editProfilePhone: document.getElementById('editProfilePhone'),
+    proExtraProfileFields: document.getElementById('proExtraProfileFields'),
+    editProfileTitle: document.getElementById('editProfileTitle'),
+    editProfilePrice: document.getElementById('editProfilePrice'),
+    editProfileBio: document.getElementById('editProfileBio'),
+    btnTriggerDeleteProfile: document.getElementById('btnTriggerDeleteProfile'),
+    deleteConfirmModal: document.getElementById('deleteConfirmModal'),
+    btnCancelDelete: document.getElementById('btnCancelDelete'),
+    btnConfirmDelete: document.getElementById('btnConfirmDelete')
   };
 
   function scrollToPros() {
@@ -64,53 +130,40 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   window.scrollToPros = scrollToPros;
 
-  // Filtragem rápida por categoria na barra Hero
-  window.ChamaProAppFilterCategory = (catId) => {
-    state.selectedCategory = catId;
-    state.searchQuery = '';
-    if (el.searchInput) el.searchInput.value = '';
-    renderCategories();
-    renderPros();
-    if (window.ChamaProGeo && window.ChamaProGeo.renderMarkers) {
-      window.ChamaProGeo.renderMarkers(getFilteredPros());
+  // Abrir Modal de Gerenciamento do Meu Perfil
+  function openMyProfileModal() {
+    const user = window.ChamaProAuth.getUser();
+    if (!user) {
+      openModal(el.authModal);
+      activateAuthTab('login');
+      return;
     }
-    scrollToPros();
-  };
 
-  // 1. Populador de Profissões Dinâmicas nos Formulários e Filtros (RF04)
-  async function populateProfessionsOptions() {
-    if (!window.TaNaMaoDB) return;
-    const professions = await window.TaNaMaoDB.getProfessions();
+    state.currentProfileAvatar = user.avatar;
+    if (el.myProfileAvatarPreview) {
+      el.myProfileAvatarPreview.src = user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=140&q=80';
+    }
+    if (el.editProfileName) el.editProfileName.value = user.name || '';
+    if (el.editProfileEmail) el.editProfileEmail.value = user.email || '';
+    if (el.editProfilePhone) el.editProfilePhone.value = user.phone || (user.proDetails && user.proDetails.phone) || '';
 
-    // Atualiza Select de Registro de Profissional
-    if (el.regProCategory) {
-      const currentVal = el.regProCategory.value;
-      let html = professions.map(p => `<option value="${p.slug}">${p.name}${p.isCustom ? ' (Personalizada)' : ''}</option>`).join('');
-      html += '<option value="__custom__">➕ Outra profissão...</option>';
-      el.regProCategory.innerHTML = html;
-      if (currentVal && Array.from(el.regProCategory.options).some(o => o.value === currentVal)) {
-        el.regProCategory.value = currentVal;
+    const isPro = user.role === 'pro';
+    if (el.myProfileBadgeRole) {
+      el.myProfileBadgeRole.textContent = isPro ? 'Profissional Parceiro' : 'Cliente';
+    }
+
+    if (el.proExtraProfileFields) {
+      if (isPro) {
+        el.proExtraProfileFields.style.display = 'block';
+        if (el.editProfileTitle) el.editProfileTitle.value = (user.proDetails && user.proDetails.title) || user.title || '';
+        if (el.editProfilePrice) el.editProfilePrice.value = (user.proDetails && user.proDetails.startingPrice) || user.startingPrice || '';
+        if (el.editProfileBio) el.editProfileBio.value = (user.proDetails && user.proDetails.bio) || user.bio || '';
+      } else {
+        el.proExtraProfileFields.style.display = 'none';
       }
     }
 
-    // Atualiza Select de Orçamento
-    if (el.quoteCategorySelect) {
-      el.quoteCategorySelect.innerHTML = professions.map(p => `<option value="${p.slug}">${p.name}</option>`).join('');
-    }
-
-    // Atualiza Select da Sidebar
-    if (el.sidebarCategory) {
-      let sidebarHtml = '<option value="all">Todas as categorias</option>';
-      window.ChamaProData.categories.forEach(cat => {
-        sidebarHtml += `<option value="${cat.id}">${cat.name}</option>`;
-      });
-      // Adicionar opções customizadas na sidebar caso existam
-      professions.filter(p => p.isCustom).forEach(cp => {
-        sidebarHtml += `<option value="${cp.slug}">${cp.name}</option>`;
-      });
-      el.sidebarCategory.innerHTML = sidebarHtml;
-      el.sidebarCategory.value = state.selectedCategory;
-    }
+    openModal(el.myProfileModal);
   }
 
   // 2. Renderização da Barra de Usuário no Topo
@@ -120,21 +173,36 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (user) {
       el.userNavArea.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 0.65rem; color: #fff;">
-          <img src="${user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80'}" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 2px solid var(--brand-primary);">
-          <span style="font-size: 0.88rem; font-weight: 700; color: #fff;">${user.name}</span>
-          <button id="btnLogoutUser" style="background: none; border: none; color: rgba(255,255,255,0.7); font-size: 0.95rem; cursor: pointer; padding: 0.3rem;" title="Sair"><i class="fa-solid fa-right-from-bracket"></i></button>
-        </div>
+        <button id="btnOpenMyProfile" class="nav-profile-pill" title="Clique para ver e personalizar seu perfil">
+          <img src="${user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80'}" class="nav-profile-avatar" id="navUserAvatar" alt="${user.name}">
+          <span class="nav-profile-name">${user.name}</span>
+          <i class="fa-solid fa-gear nav-profile-gear"></i>
+        </button>
+        <button id="btnLogoutUser" class="nav-btn-logout" title="Sair da conta">
+          <i class="fa-solid fa-right-from-bracket"></i>
+        </button>
         <button class="nav-btn-register" id="btnRegisterNav">
           <i class="fa-solid fa-plus"></i> Cadastrar serviço
         </button>
       `;
+
+      document.getElementById('btnOpenMyProfile')?.addEventListener('click', openMyProfileModal);
 
       document.getElementById('btnLogoutUser')?.addEventListener('click', () => {
         window.ChamaProAuth.logout();
         showToast('Sessão encerrada com sucesso.');
         renderUserNav();
         renderPros();
+      });
+
+      document.getElementById('btnRegisterNav')?.addEventListener('click', () => {
+        if (user.role === 'pro') {
+          showToast('Você já é um profissional cadastrado! Edite seus serviços em Meu Perfil.');
+          openMyProfileModal();
+        } else {
+          openModal(el.authModal);
+          activateAuthTab('pro');
+        }
       });
     } else {
       el.userNavArea.innerHTML = `
@@ -145,16 +213,17 @@ document.addEventListener('DOMContentLoaded', async () => {
           <i class="fa-solid fa-plus"></i> Cadastrar serviço
         </button>
       `;
-    }
 
-    document.getElementById('btnOpenAuth')?.addEventListener('click', () => {
-      openModal(el.authModal);
-      if (el.tabAuthLogin) el.tabAuthLogin.click();
-    });
-    document.getElementById('btnRegisterNav')?.addEventListener('click', () => {
-      openModal(el.authModal);
-      if (el.tabAuthRegisterPro) el.tabAuthRegisterPro.click();
-    });
+      document.getElementById('btnOpenAuth')?.addEventListener('click', () => {
+        openModal(el.authModal);
+        activateAuthTab('login');
+      });
+
+      document.getElementById('btnRegisterNav')?.addEventListener('click', () => {
+        openModal(el.authModal);
+        activateAuthTab('pro');
+      });
+    }
   }
 
   // 3. Render Categorias
@@ -596,7 +665,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 13. Submissão do Formulário de Cadastro de Profissional (RF04 & RF05)
+  // 12b. Submissão do Formulário de Cadastro de Cliente (com foto do dispositivo)
+  if (el.formRegisterClient) {
+    el.formRegisterClient.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('regClientName')?.value;
+      const email = document.getElementById('regClientEmail')?.value;
+      const pass = document.getElementById('regClientPass')?.value;
+
+      try {
+        const user = await window.ChamaProAuth.registerClient({
+          name,
+          email,
+          password: pass,
+          avatar: state.regClientAvatar
+        });
+        closeModal(el.authModal);
+        showToast(`Conta criada com sucesso! Bem-vindo(a), ${user.name}!`);
+        renderUserNav();
+        renderPros();
+      } catch (err) {
+        showToast(err.message || 'Erro ao criar conta.', 'error');
+      }
+    });
+  }
+
+  // 13. Submissão do Formulário de Cadastro de Profissional (com foto do dispositivo)
   if (el.formRegisterPro) {
     el.formRegisterPro.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -631,6 +725,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           bio,
           specialties,
           phone,
+          avatar: state.regProAvatar,
           email: `${name.toLowerCase().replace(/\s+/g, '')}@tanamao.com`
         });
 
@@ -644,6 +739,120 @@ document.addEventListener('DOMContentLoaded', async () => {
         scrollToPros();
       } catch (err) {
         showToast(err.message || 'Erro ao realizar cadastro.', 'error');
+      }
+    });
+  }
+
+  // 14. Eventos de Upload de Foto do Dispositivo
+  if (el.regClientAvatarFile) {
+    el.regClientAvatarFile.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try {
+        const dataUrl = await processImageFile(file, 280, 280, 0.85);
+        if (dataUrl) {
+          state.regClientAvatar = dataUrl;
+          if (el.regClientAvatarPreview) el.regClientAvatarPreview.src = dataUrl;
+          showToast('Foto do perfil selecionada!');
+        }
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  }
+
+  if (el.regProAvatarFile) {
+    el.regProAvatarFile.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try {
+        const dataUrl = await processImageFile(file, 280, 280, 0.85);
+        if (dataUrl) {
+          state.regProAvatar = dataUrl;
+          if (el.regProAvatarPreview) el.regProAvatarPreview.src = dataUrl;
+          showToast('Foto profissional selecionada!');
+        }
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  }
+
+  if (el.myProfileAvatarFile) {
+    el.myProfileAvatarFile.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try {
+        const dataUrl = await processImageFile(file, 300, 300, 0.85);
+        if (dataUrl) {
+          state.currentProfileAvatar = dataUrl;
+          if (el.myProfileAvatarPreview) el.myProfileAvatarPreview.src = dataUrl;
+          await window.ChamaProAuth.updateProfile({ avatar: dataUrl });
+          renderUserNav();
+          renderPros();
+          showToast('Foto do perfil atualizada com sucesso!');
+        }
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  }
+
+  // 15. Submissão do Formulário de Edição de Perfil
+  if (el.formEditProfile) {
+    el.formEditProfile.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = el.editProfileName?.value;
+      const phone = el.editProfilePhone?.value;
+      const updates = { name, phone };
+
+      if (state.currentProfileAvatar) {
+        updates.avatar = state.currentProfileAvatar;
+      }
+
+      const user = window.ChamaProAuth.getUser();
+      if (user && user.role === 'pro') {
+        if (el.editProfileTitle) updates.title = el.editProfileTitle.value;
+        if (el.editProfilePrice) updates.startingPrice = parseFloat(el.editProfilePrice.value) || 0;
+        if (el.editProfileBio) updates.bio = el.editProfileBio.value;
+      }
+
+      try {
+        await window.ChamaProAuth.updateProfile(updates);
+        closeModal(el.myProfileModal);
+        showToast('Perfil atualizado com sucesso!');
+        renderUserNav();
+        renderPros();
+      } catch (err) {
+        showToast(err.message || 'Erro ao atualizar perfil.', 'error');
+      }
+    });
+  }
+
+  // 16. Exclusão Definitiva de Perfil
+  if (el.btnTriggerDeleteProfile) {
+    el.btnTriggerDeleteProfile.addEventListener('click', () => {
+      openModal(el.deleteConfirmModal);
+    });
+  }
+
+  if (el.btnCancelDelete) {
+    el.btnCancelDelete.addEventListener('click', () => {
+      closeModal(el.deleteConfirmModal);
+    });
+  }
+
+  if (el.btnConfirmDelete) {
+    el.btnConfirmDelete.addEventListener('click', async () => {
+      try {
+        await window.ChamaProAuth.deleteProfile();
+        closeModal(el.deleteConfirmModal);
+        closeModal(el.myProfileModal);
+        showToast('Seu perfil foi excluído com sucesso.');
+        renderUserNav();
+        renderPros();
+      } catch (err) {
+        showToast(err.message || 'Erro ao excluir perfil.', 'error');
       }
     });
   }
@@ -810,28 +1019,53 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // Tabs de Auth
-  if (el.tabAuthLogin && el.tabAuthRegisterPro) {
-    el.tabAuthLogin.addEventListener('click', () => {
-      el.tabAuthLogin.classList.add('active');
-      el.tabAuthRegisterPro.classList.remove('active');
-      if (el.formLoginClient) el.formLoginClient.style.display = 'block';
-      if (el.formRegisterPro) el.formRegisterPro.style.display = 'none';
-    });
+  // Alternador de Abas de Autenticação (Login / Cadastrar Cliente / Cadastrar Profissional)
+  function activateAuthTab(tabName) {
+    [el.tabAuthLogin, el.tabAuthRegisterClient, el.tabAuthRegisterPro].forEach(btn => btn?.classList.remove('active'));
+    if (el.formLoginClient) el.formLoginClient.style.display = 'none';
+    if (el.formRegisterClient) el.formRegisterClient.style.display = 'none';
+    if (el.formRegisterPro) el.formRegisterPro.style.display = 'none';
 
-    el.tabAuthRegisterPro.addEventListener('click', () => {
-      el.tabAuthRegisterPro.classList.add('active');
-      el.tabAuthLogin.classList.remove('active');
+    if (tabName === 'login') {
+      el.tabAuthLogin?.classList.add('active');
+      if (el.formLoginClient) el.formLoginClient.style.display = 'block';
+    } else if (tabName === 'client') {
+      el.tabAuthRegisterClient?.classList.add('active');
+      if (el.formRegisterClient) el.formRegisterClient.style.display = 'block';
+    } else if (tabName === 'pro') {
+      el.tabAuthRegisterPro?.classList.add('active');
       if (el.formRegisterPro) el.formRegisterPro.style.display = 'block';
-      if (el.formLoginClient) el.formLoginClient.style.display = 'none';
-    });
+    }
   }
+
+  // Tabs de Auth
+  el.tabAuthLogin?.addEventListener('click', () => activateAuthTab('login'));
+  el.tabAuthRegisterClient?.addEventListener('click', () => activateAuthTab('client'));
+  el.tabAuthRegisterPro?.addEventListener('click', () => activateAuthTab('pro'));
+
+  // Links rápidos nos formulários
+  document.getElementById('linkGoRegisterClient')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    activateAuthTab('client');
+  });
+  document.getElementById('linkGoRegisterPro')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    activateAuthTab('pro');
+  });
+  document.getElementById('linkClientGoLogin')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    activateAuthTab('login');
+  });
+  document.getElementById('linkProGoLogin')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    activateAuthTab('login');
+  });
 
   // Footer Register Pro Trigger
   document.getElementById('btnRegisterProFooter')?.addEventListener('click', (e) => {
     e.preventDefault();
     openModal(el.authModal);
-    el.tabAuthRegisterPro?.click();
+    activateAuthTab('pro');
   });
 
   // Listeners de Autenticação

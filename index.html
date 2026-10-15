@@ -297,20 +297,27 @@
        MODAL SYSTEM
        =================================================================== -->
 
-  <!-- Modal Auth -->
+  <!-- Modal Auth (Login e Cadastros) -->
   <div class="modal-overlay" id="authModal">
     <div class="modal-content" style="max-width: 540px;">
       <div class="modal-header">
-        <h3 class="modal-title" id="authModalTitle">Acessar a Plataforma</h3>
+        <h3 class="modal-title" id="authModalTitle">Acesso & Cadastro</h3>
         <button class="modal-close" onclick="document.getElementById('authModal').classList.remove('active');"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body">
-        <div style="display: flex; gap: 0.5rem; background: var(--bg-subtle); padding: 0.4rem; border-radius: var(--radius-md); margin-bottom: 1.5rem;">
-          <button class="btn-outline active" id="tabAuthLogin" style="flex: 1; border: none; border-radius: var(--radius-sm);">Entrar como Cliente</button>
-          <button class="btn-outline" id="tabAuthRegisterPro" style="flex: 1; border: none; border-radius: var(--radius-sm);">Cadastrar Profissional</button>
+        <div class="auth-tabs-wrapper">
+          <button class="btn-outline active" id="tabAuthLogin"><i class="fa-solid fa-right-to-bracket"></i> Entrar</button>
+          <button class="btn-outline" id="tabAuthRegisterClient"><i class="fa-solid fa-user"></i> Criar Conta</button>
+          <button class="btn-outline" id="tabAuthRegisterPro"><i class="fa-solid fa-user-plus"></i> Sou Profissional</button>
         </div>
 
+        <!-- Formulário de Login (Cliente ou Profissional) -->
         <form id="formLoginClient">
+          <div style="margin-bottom: 1.25rem; text-align: center;">
+            <p style="font-size: 0.88rem; color: var(--text-secondary);">
+              Acesse sua conta com e-mail e senha para gerenciar seus orçamentos ou atendimentos.
+            </p>
+          </div>
           <div class="form-group">
             <label class="form-label">E-mail</label>
             <input type="email" id="loginEmail" class="form-control" placeholder="seu@email.com" required>
@@ -319,12 +326,74 @@
             <label class="form-label">Senha</label>
             <input type="password" id="loginPass" class="form-control" placeholder="Sua senha secreta" required>
           </div>
-          <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.9rem;">
-            Entrar no Tá na Mão
+          <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.9rem; margin-top: 0.5rem;">
+            <i class="fa-solid fa-right-to-bracket"></i> Entrar no Tá na Mão
           </button>
+          <div style="margin-top: 1.25rem; text-align: center; font-size: 0.82rem; color: var(--text-muted);">
+            Não tem uma conta? 
+            <a href="#" id="linkGoRegisterClient" style="color: var(--brand-primary); font-weight: 700;">Criar conta de cliente</a> ou 
+            <a href="#" id="linkGoRegisterPro" style="color: var(--brand-primary); font-weight: 700;">Cadastrar como profissional</a>
+          </div>
         </form>
 
+        <!-- Formulário de Cadastro de Cliente com Foto do Dispositivo -->
+        <form id="formRegisterClient" style="display: none;">
+          <div class="form-group" style="text-align: center; margin-bottom: 1.25rem;">
+            <label class="form-label" style="margin-bottom: 0.5rem;">Sua Foto de Perfil (Do seu dispositivo)</label>
+            <div class="avatar-picker-container">
+              <div class="avatar-preview-wrap">
+                <img id="regClientAvatarPreview" class="avatar-preview-img" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=140&q=80" alt="Preview da Foto">
+                <label for="regClientAvatarFile" class="avatar-upload-overlay" title="Escolher foto do seu dispositivo">
+                  <i class="fa-solid fa-camera"></i>
+                </label>
+              </div>
+              <input type="file" id="regClientAvatarFile" accept="image/*" style="display: none;">
+              <label for="regClientAvatarFile" class="btn-upload-label">
+                <i class="fa-solid fa-camera"></i> Escolher foto do seu dispositivo
+              </label>
+              <span class="upload-tip">Envie uma foto do seu celular ou computador</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Nome Completo</label>
+            <input type="text" id="regClientName" class="form-control" placeholder="Ex: Maria Fernandes" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">E-mail</label>
+            <input type="email" id="regClientEmail" class="form-control" placeholder="maria@email.com" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Senha</label>
+            <input type="password" id="regClientPass" class="form-control" placeholder="Crie uma senha segura" required>
+          </div>
+          <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.9rem; margin-top: 0.5rem;">
+            <i class="fa-solid fa-user-check"></i> Criar Minha Conta
+          </button>
+          <div style="margin-top: 1.25rem; text-align: center; font-size: 0.82rem; color: var(--text-muted);">
+            Já possui uma conta? <a href="#" id="linkClientGoLogin" style="color: var(--brand-primary); font-weight: 700;">Fazer Login</a>
+          </div>
+        </form>
+
+        <!-- Formulário de Cadastro de Profissional com Foto do Dispositivo -->
         <form id="formRegisterPro" style="display: none;">
+          <div class="form-group" style="text-align: center; margin-bottom: 1.25rem;">
+            <label class="form-label" style="margin-bottom: 0.5rem;">Sua Foto Profissional (Do seu dispositivo)</label>
+            <div class="avatar-picker-container">
+              <div class="avatar-preview-wrap">
+                <img id="regProAvatarPreview" class="avatar-preview-img" src="https://images.unsplash.com/photo-1560250097-0b93528c311a?w=140&q=80" alt="Preview Profissional">
+                <label for="regProAvatarFile" class="avatar-upload-overlay" title="Escolher foto do seu dispositivo">
+                  <i class="fa-solid fa-camera"></i>
+                </label>
+              </div>
+              <input type="file" id="regProAvatarFile" accept="image/*" style="display: none;">
+              <label for="regProAvatarFile" class="btn-upload-label">
+                <i class="fa-solid fa-camera"></i> Escolher foto do seu dispositivo
+              </label>
+              <span class="upload-tip">Adicione uma foto de rosto para transmitir credibilidade</span>
+            </div>
+          </div>
+
           <div class="form-group">
             <label class="form-label">Nome Completo</label>
             <input type="text" id="regProName" class="form-control" placeholder="Ex: Ricardo Silva" required>
@@ -379,7 +448,117 @@
           <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.9rem;">
             <i class="fa-solid fa-user-plus"></i> Finalizar Cadastro Profissional
           </button>
+          <div style="margin-top: 1.25rem; text-align: center; font-size: 0.82rem; color: var(--text-muted);">
+            Já possui uma conta? <a href="#" id="linkProGoLogin" style="color: var(--brand-primary); font-weight: 700;">Fazer Login</a>
+          </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Meu Perfil (Personalização com Fotos do Dispositivo e Exclusão de Perfil) -->
+  <div class="modal-overlay" id="myProfileModal">
+    <div class="modal-content" style="max-width: 560px;">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class="fa-solid fa-user-gear" style="color: var(--brand-primary);"></i> Meu Perfil</h3>
+        <button class="modal-close" onclick="document.getElementById('myProfileModal').classList.remove('active');"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="formEditProfile">
+          <!-- Seção de Personalização da Foto de Perfil do Dispositivo -->
+          <div class="profile-photo-editor">
+            <div class="avatar-preview-wrap large">
+              <img id="myProfileAvatarPreview" class="avatar-preview-img large" src="" alt="Sua Foto de Perfil">
+              <label for="myProfileAvatarFile" class="avatar-upload-overlay" title="Alterar foto do dispositivo">
+                <i class="fa-solid fa-camera"></i>
+              </label>
+            </div>
+            <div class="profile-photo-info">
+              <input type="file" id="myProfileAvatarFile" accept="image/*" style="display: none;">
+              <label for="myProfileAvatarFile" class="btn-upload-label">
+                <i class="fa-solid fa-camera"></i> Escolher foto do seu dispositivo
+              </label>
+              <div id="myProfileBadgeRole" class="profile-badge-role">Cliente</div>
+              <span class="upload-tip">A imagem será salva instantaneamente no seu perfil</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Nome Completo</label>
+            <input type="text" id="editProfileName" class="form-control" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">E-mail Cadastrado</label>
+            <input type="email" id="editProfileEmail" class="form-control" disabled style="background: var(--bg-subtle); color: var(--text-muted); cursor: not-allowed;">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">WhatsApp / Telefone</label>
+            <input type="tel" id="editProfilePhone" class="form-control" placeholder="(81) 98888-7777">
+          </div>
+
+          <!-- Campos extras caso o usuário seja profissional -->
+          <div id="proExtraProfileFields" style="display: none;">
+            <div class="form-group">
+              <label class="form-label">Título Profissional</label>
+              <input type="text" id="editProfileTitle" class="form-control" placeholder="Ex: Eletricista Residencial">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Preço Inicial Estimado (R$)</label>
+              <input type="number" id="editProfilePrice" class="form-control" placeholder="80">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Sua Bio & Experiência</label>
+              <textarea id="editProfileBio" class="form-control" rows="3" placeholder="Conte mais sobre seus serviços..."></textarea>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.85rem; margin-top: 0.5rem;">
+            <i class="fa-solid fa-floppy-disk"></i> Salvar Alterações do Perfil
+          </button>
+        </form>
+
+        <!-- Zona de Perigo: Exclusão do Perfil -->
+        <div class="danger-zone-card">
+          <div class="danger-zone-header">
+            <i class="fa-solid fa-triangle-exclamation danger-icon"></i>
+            <div>
+              <h4 class="danger-zone-title">Excluir Meu Perfil</h4>
+              <p class="danger-zone-desc">
+                Deseja encerrar sua conta? Ao excluir seu perfil, todos os seus dados cadastrais, fotos e anúncios profissionais serão removidos definitivamente.
+              </p>
+            </div>
+          </div>
+          <button type="button" class="btn-danger" id="btnTriggerDeleteProfile">
+            <i class="fa-solid fa-trash-can"></i> Excluir perfil definitivamente
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Confirmação de Exclusão -->
+  <div class="modal-overlay" id="deleteConfirmModal">
+    <div class="modal-content" style="max-width: 440px; text-align: center;">
+      <div class="modal-body" style="padding: 2rem 1.5rem;">
+        <div class="delete-icon-circle">
+          <i class="fa-solid fa-trash-can"></i>
+        </div>
+        <h3 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 0.75rem; color: var(--navy-dark);">
+          Excluir seu perfil?
+        </h3>
+        <p style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 1.75rem;">
+          Esta ação é <strong>irreversível</strong>. Todos os seus dados, fotos e serviços serão permanentemente apagados do sistema.
+        </p>
+        <div style="display: flex; gap: 0.75rem;">
+          <button type="button" class="btn-outline" id="btnCancelDelete" style="flex: 1;">
+            Cancelar
+          </button>
+          <button type="button" class="btn-danger-solid" id="btnConfirmDelete" style="flex: 1;">
+            Sim, Excluir Perfil
+          </button>
+        </div>
       </div>
     </div>
   </div>
